@@ -11,7 +11,8 @@ export class ResultCollector {
   private totalExpected = 0
   private completedCount = 0
   private failedCount = 0
-  private resolveWaitAll: ((value: { success: number; failed: number }) => void) | null = null
+  private cancelledCount = 0
+  private resolveWaitAll: ((value: { success: number; failed: number; cancelled: number }) => void) | null = null
 
   /**
    * 初始化收集器
@@ -21,6 +22,7 @@ export class ResultCollector {
     this.totalExpected = totalExpected
     this.completedCount = 0
     this.failedCount = 0
+    this.cancelledCount = 0
     this.resolveWaitAll = null
   }
 
@@ -40,14 +42,17 @@ export class ResultCollector {
       this.completedCount++
     } else if (task.status === 'failed') {
       this.failedCount++
+    } else if (task.status === 'cancelled') {
+      this.cancelledCount++
     }
 
     // 检查是否全部完成
-    if (this.completedCount + this.failedCount >= this.totalExpected) {
+    if (this.completedCount + this.failedCount + this.cancelledCount >= this.totalExpected) {
       if (this.resolveWaitAll) {
         this.resolveWaitAll({
           success: this.completedCount,
-          failed: this.failedCount
+          failed: this.failedCount,
+          cancelled: this.cancelledCount
         })
         this.resolveWaitAll = null
       }
@@ -57,14 +62,15 @@ export class ResultCollector {
   /**
    * 等待所有结果
    */
-  waitForAll(totalExpected: number): Promise<{ success: number; failed: number }> {
+  waitForAll(totalExpected: number): Promise<{ success: number; failed: number; cancelled: number }> {
     this.totalExpected = totalExpected
 
     // 如果已经全部完成，直接返回
-    if (this.completedCount + this.failedCount >= totalExpected) {
+    if (this.completedCount + this.failedCount + this.cancelledCount >= totalExpected) {
       return Promise.resolve({
         success: this.completedCount,
-        failed: this.failedCount
+        failed: this.failedCount,
+        cancelled: this.cancelledCount
       })
     }
 
@@ -103,15 +109,20 @@ export class ResultCollector {
     return this.getAll().filter(t => t.status === 'failed')
   }
 
+  getCancelled(): PipelineTask[] {
+    return this.getAll().filter(t => t.status === 'cancelled')
+  }
+
   /**
    * 获取统计
    */
-  getStats(): { total: number; completed: number; failed: number; pending: number } {
+  getStats(): { total: number; completed: number; failed: number; cancelled: number; pending: number } {
     return {
       total: this.totalExpected,
       completed: this.completedCount,
       failed: this.failedCount,
-      pending: this.totalExpected - this.completedCount - this.failedCount
+      cancelled: this.cancelledCount,
+      pending: this.totalExpected - this.completedCount - this.failedCount - this.cancelledCount
     }
   }
 
@@ -123,6 +134,7 @@ export class ResultCollector {
     this.totalExpected = 0
     this.completedCount = 0
     this.failedCount = 0
+    this.cancelledCount = 0
     this.resolveWaitAll = null
   }
 }

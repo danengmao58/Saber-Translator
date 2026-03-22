@@ -12,6 +12,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useImageStore } from '@/stores/imageStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useTranslation } from '@/composables/useTranslationPipeline'
 import { getFontList, uploadFont } from '@/api/config'
 import { showToast } from '@/utils/toast'
 import { DEFAULT_FONT_FAMILY } from '@/constants'
@@ -33,6 +34,7 @@ import CollapsiblePanel from '@/components/common/CollapsiblePanel.vue'
 const emit = defineEmits<{
   /** 启动工作流 */
   (e: 'runWorkflow', payload: WorkflowRunRequest): void
+  (e: 'cancelWorkflow'): void
   /** 上一张图片 */
   (e: 'previous'): void
   /** 下一张图片 */
@@ -67,6 +69,7 @@ interface ApplySettingsOptions {
 
 const imageStore = useImageStore()
 const settingsStore = useSettingsStore()
+const translation = useTranslation()
 
 // ============================================================
 // 状态定义
@@ -178,6 +181,9 @@ const failedImageCount = computed(() => imageStore.failedImageCount)
 
 /** 是否有失败图片 */
 const hasFailedImages = computed(() => failedImageCount.value > 0)
+const cancelledImageCount = computed(() => imageStore.cancelledImageCount)
+const batchSummary = computed(() => imageStore.batchTranslationSummary)
+const batchSummaryStatus = computed(() => batchSummary.value.status)
 
 /** 当前工作流配置 */
 const selectedWorkflowConfig = computed<WorkflowModeConfig>(() => {
@@ -205,6 +211,27 @@ const workflowModeOptions = computed(() => {
 
 /** 启动按钮文案 */
 const workflowStartLabel = computed(() => selectedWorkflowConfig.value.startLabel)
+const isBatchWorkflowMode = computed(() => ['translate-batch', 'hq-batch', 'proofread-batch', 'remove-batch'].includes(selectedWorkflowMode.value))
+const isWorkflowRunning = computed(() => {
+  const runningMode = batchSummary.value.mode
+
+  // 批量翻译时，管线实际启动的模式是 standard/hq/proofread/removeText
+  const isBatchRunning =
+    imageStore.isBatchTranslationInProgress &&
+    batchSummary.value.status === 'running' &&
+    ['standard', 'hq', 'proofread', 'removeText', 'translate-batch', 'hq-batch', 'proofread-batch', 'remove-batch'].includes(runningMode as string)
+
+  // 支持单页翻译状态
+  const isSingleRunning = translation.isTranslating.value && ['translate-current', 'remove-current'].includes(selectedWorkflowMode.value)
+
+  return isBatchRunning || isSingleRunning
+})
+const canCancelWorkflow = computed(() => isWorkflowRunning.value && batchSummaryStatus.value !== 'cancelling')
+const workflowButtonLabel = computed(() => {
+  if (batchSummaryStatus.value === 'cancelling') return '取消中...'
+  if (isWorkflowRunning.value) return '取消翻译'
+  return workflowStartLabel.value
+})
 
 /** 当前模式的范围/对象标签 */
 const workflowContextTag = computed(() => {
@@ -240,6 +267,12 @@ const workflowModeTag = computed(() => {
 
 /** 当前模式说明文案 */
 const workflowDescription = computed(() => {
+  if (batchSummaryStatus.value === 'cancelled') {
+    return `已取消 ${cancelledImageCount.value} 张，失败 ${failedImageCount.value} 张。`
+  }
+  if (batchSummaryStatus.value === 'failed') {
+    return `处理失败 ${failedImageCount.value} 张${cancelledImageCount.value > 0 ? `，已取消 ${cancelledImageCount.value} 张` : ''}。`
+  }
   switch (selectedWorkflowMode.value) {
     case 'delete-current':
       return '删除前会弹出确认，建议先检查当前页是否已保存。'
@@ -633,6 +666,10 @@ function handleWorkflowModeChange(value: string | number) {
  * 启动当前工作流
  */
 function handleRunWorkflow() {
+  if (isWorkflowRunning.value) {
+    emit('cancelWorkflow')
+    return
+  }
   if (!canRunWorkflow.value) return
 
   const payload: WorkflowRunRequest = {
@@ -969,11 +1006,11 @@ function handleRunWorkflow() {
         <button
           id="runWorkflowButton"
           class="settings-button workflow-run-button"
-          :class="{ 'danger-button': isDangerousWorkflow }"
-          :disabled="!canRunWorkflow"
+          :class="{ 'danger-button': isDangerousWorkflow || isWorkflowRunning, 'cancel-button': isWorkflowRunning }"
+          :disabled="batchSummaryStatus === 'cancelling' || (!isWorkflowRunning && !canRunWorkflow)"
           @click="handleRunWorkflow"
         >
-          {{ workflowStartLabel }}
+          {{ workflowButtonLabel }}
         </button>
         <div class="workflow-description">
           {{ workflowDescription }}
@@ -1360,6 +1397,14 @@ function handleRunWorkflow() {
 .apply-settings-group .settings-button:disabled {
   background: #c2c9d4;
   cursor: not-allowed;
+}
+
+.workflow-run-button.cancel-button {
+  background: linear-gradient(135deg, #d9534f, #bf2f2b);
+}
+
+.workflow-run-button.cancel-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c8423d, #a92723);
 }
 
 .settings-gear-btn {

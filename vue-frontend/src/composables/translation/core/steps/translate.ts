@@ -8,6 +8,7 @@ import { parallelTranslate, type ParallelTranslateResponse } from '@/api/paralle
 import { translateSingleText } from '@/api/translate'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { RateLimiter } from '@/utils/rateLimiter'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 export interface TranslateInput {
     imageIndex: number
@@ -33,6 +34,8 @@ export async function executeTranslate(input: TranslateInput): Promise<Translate
     const settingsStore = useSettingsStore()
     const settings = settingsStore.settings
     const translationMode = settings.translation.translationMode || 'batch'
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     if (translationMode === 'single') {
         // ==================== 逐气泡翻译模式 ====================
@@ -70,7 +73,7 @@ export async function executeTranslate(input: TranslateInput): Promise<Translate
                     use_json_format: settings.translation.isJsonMode,
                     rpm_limit_translation: settings.translation.rpmLimit,
                     max_retries: settings.translation.maxRetries
-                })
+                }, { signal })
 
                 if (response.success && response.data) {
                     translatedTexts.push(response.data.translated_text || '')
@@ -91,7 +94,7 @@ export async function executeTranslate(input: TranslateInput): Promise<Translate
                         prompt_content: settings.textboxPrompt,
                         rpm_limit_translation: settings.translation.rpmLimit,
                         max_retries: settings.translation.maxRetries
-                    })
+                    }, { signal })
 
                     if (textboxResponse.success && textboxResponse.data) {
                         textboxTexts.push(textboxResponse.data.translated_text || '')
@@ -134,7 +137,7 @@ export async function executeTranslate(input: TranslateInput): Promise<Translate
             rpm_limit: settings.translation.rpmLimit,
             max_retries: settings.translation.maxRetries,
             use_json_format: settings.translation.isJsonMode
-        })
+        }, { signal })
 
         if (!response.success) {
             throw new Error(response.error || '翻译失败')

@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './client'
+import type { AxiosRequestConfig } from 'axios'
 import type {
   ApiResponse,
   ReRenderResponse,
@@ -179,10 +180,11 @@ export async function applySettingsToAllImages(
  * @param params 翻译参数
  */
 export async function translateSingleText(
-  params: TranslateSingleTextParams
+  params: TranslateSingleTextParams,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<{ translated_text: string }>> {
   try {
-    const result = await apiClient.post<{ translated_text: string }>('/api/translate_single_text', params)
+    const result = await apiClient.post<{ translated_text: string }>('/api/translate_single_text', params, config)
     return {
       success: true,
       data: result
@@ -199,8 +201,8 @@ export async function translateSingleText(
  * 高质量翻译（批量上下文翻译）
  * @param params 翻译参数
  */
-export async function hqTranslateBatch(params: HqTranslateParams): Promise<HqTranslateResponse> {
-  return apiClient.post<HqTranslateResponse>('/api/hq_translate_batch', params)
+export async function hqTranslateBatch(params: HqTranslateParams, config?: AxiosRequestConfig): Promise<HqTranslateResponse> {
+  return apiClient.post<HqTranslateResponse>('/api/hq_translate_batch', params, config)
 }
 
 // ==================== OCR 和修复 API ====================

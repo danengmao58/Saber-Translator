@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useImageStore } from '@/stores/imageStore'
 import type { BubbleCoords } from '@/types/bubble'
 import type { ImageData as AppImageData } from '@/types/image'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 export interface DetectionInput {
     imageIndex: number
@@ -64,6 +65,8 @@ export async function executeDetection(input: DetectionInput): Promise<Detection
 
     const settings = settingsStore.settings
     const base64 = extractBase64(image.originalDataURL)
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     // 步骤1: 使用用户选择的检测器进行检测（获取文本框）
     const response: ParallelDetectResponse = await parallelDetect({
@@ -74,7 +77,7 @@ export async function executeDetection(input: DetectionInput): Promise<Detection
         box_expand_bottom: settings.boxExpand.bottom,
         box_expand_left: settings.boxExpand.left,
         box_expand_right: settings.boxExpand.right
-    })
+    }, { signal })
 
     if (!response.success) {
         throw new Error(response.error || '检测失败')
@@ -95,7 +98,7 @@ export async function executeDetection(input: DetectionInput): Promise<Detection
             box_expand_bottom: 0,
             box_expand_left: 0,
             box_expand_right: 0
-        })
+        }, { signal })
 
         if (maskResponse.success && maskResponse.raw_mask) {
             textMaskData = maskResponse.raw_mask

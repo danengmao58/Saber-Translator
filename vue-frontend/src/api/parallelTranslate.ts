@@ -5,6 +5,7 @@
  */
 
 import { apiClient } from './client'
+import type { AxiosRequestConfig } from 'axios'
 
 // ==================== 检测 API ====================
 
@@ -29,8 +30,8 @@ export interface ParallelDetectResponse {
   error?: string
 }
 
-export async function parallelDetect(params: ParallelDetectParams): Promise<ParallelDetectResponse> {
-  return apiClient.post<ParallelDetectResponse>('/api/parallel/detect', params)
+export async function parallelDetect(params: ParallelDetectParams, config?: AxiosRequestConfig): Promise<ParallelDetectResponse> {
+  return apiClient.post<ParallelDetectResponse>('/api/parallel/detect', params, config)
 }
 
 // ==================== OCR API ====================
@@ -60,8 +61,8 @@ export interface ParallelOcrResponse {
   error?: string
 }
 
-export async function parallelOcr(params: ParallelOcrParams): Promise<ParallelOcrResponse> {
-  return apiClient.post<ParallelOcrResponse>('/api/parallel/ocr', params)
+export async function parallelOcr(params: ParallelOcrParams, config?: AxiosRequestConfig): Promise<ParallelOcrResponse> {
+  return apiClient.post<ParallelOcrResponse>('/api/parallel/ocr', params, config)
 }
 
 // ==================== 颜色提取 API ====================
@@ -83,8 +84,8 @@ export interface ParallelColorResponse {
   error?: string
 }
 
-export async function parallelColor(params: ParallelColorParams): Promise<ParallelColorResponse> {
-  return apiClient.post<ParallelColorResponse>('/api/parallel/color', params)
+export async function parallelColor(params: ParallelColorParams, config?: AxiosRequestConfig): Promise<ParallelColorResponse> {
+  return apiClient.post<ParallelColorResponse>('/api/parallel/color', params, config)
 }
 
 // ==================== 翻译 API ====================
@@ -112,8 +113,8 @@ export interface ParallelTranslateResponse {
   error?: string
 }
 
-export async function parallelTranslate(params: ParallelTranslateParams): Promise<ParallelTranslateResponse> {
-  return apiClient.post<ParallelTranslateResponse>('/api/parallel/translate', params)
+export async function parallelTranslate(params: ParallelTranslateParams, config?: AxiosRequestConfig): Promise<ParallelTranslateResponse> {
+  return apiClient.post<ParallelTranslateResponse>('/api/parallel/translate', params, config)
 }
 
 // ==================== 修复 API ====================
@@ -137,8 +138,8 @@ export interface ParallelInpaintResponse {
   error?: string
 }
 
-export async function parallelInpaint(params: ParallelInpaintParams): Promise<ParallelInpaintResponse> {
-  return apiClient.post<ParallelInpaintResponse>('/api/parallel/inpaint', params)
+export async function parallelInpaint(params: ParallelInpaintParams, config?: AxiosRequestConfig): Promise<ParallelInpaintResponse> {
+  return apiClient.post<ParallelInpaintResponse>('/api/parallel/inpaint', params, config)
 }
 
 // ==================== 渲染 API ====================
@@ -164,6 +165,6 @@ export interface ParallelRenderResponse {
   error?: string
 }
 
-export async function parallelRender(params: ParallelRenderParams): Promise<ParallelRenderResponse> {
-  return apiClient.post<ParallelRenderResponse>('/api/parallel/render', params)
+export async function parallelRender(params: ParallelRenderParams, config?: AxiosRequestConfig): Promise<ParallelRenderResponse> {
+  return apiClient.post<ParallelRenderResponse>('/api/parallel/render', params, config)
 }

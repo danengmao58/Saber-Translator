@@ -49,6 +49,7 @@ import {
     finalizeSave,
     resetSaveState
 } from './saveStep'
+import { isTranslationCancellationError } from './cancellation'
 
 // ============================================================
 // 原子步骤类型
@@ -363,13 +364,10 @@ export function useSequentialPipeline() {
                 await stepRender(task)
                 break
             case 'save':
-                // 保存步骤：保存当前已渲染的图片（仅书架模式）
                 await saveTranslatedImage(task.imageIndex)
                 break
             case 'aiTranslate':
-                // 此分支仅作为类型完整性保留，实际不会被调用
-                // aiTranslate 在 executeBatchMode 中有批量处理逻辑
-                throw new Error('aiTranslate 应通过批量处理逻辑调用')
+                throw new Error('aiTranslate should be handled in batch mode')
         }
     }
 
@@ -456,30 +454,29 @@ export function useSequentialPipeline() {
         stepChain: AtomicStepType[],
         config: PipelineConfig,
         errors: string[]
-    ): Promise<{ completed: number; failed: number }> {
+    ): Promise<{ completed: number; failed: number; cancelled: number }> {
         let completed = 0
         let failed = 0
+        let cancelled = 0
 
         for (let imageIdx = 0; imageIdx < tasks.length; imageIdx++) {
             const task = tasks[imageIdx]!
 
-            // 检查是否取消
-            if (config.scope === 'all' && !imageStore.isBatchTranslationInProgress) {
-                console.log(`⏹️ 批量翻译已取消，停止处理`)
+            if ((config.scope === 'all' || config.scope === 'range' || config.scope === 'failed') && !imageStore.isBatchTranslationInProgress) {
+                cancelled += tasks.length - imageIdx
+                for (let i = imageIdx; i < tasks.length; i++) {
+                    imageStore.setTranslationStatus(tasks[i]!.imageIndex, 'cancelled', '翻译已取消')
+                }
                 break
             }
 
             const imageProgress = Math.floor((imageIdx / tasks.length) * 90)
             reporter.setPercentage(imageProgress, `处理图片 ${imageIdx + 1}/${tasks.length}`)
-            toast.info(`处理图片 ${imageIdx + 1}/${tasks.length}...`)
-
             imageStore.setTranslationStatus(task.imageIndex, 'processing')
-            let taskFailed = false
 
-            // 对当前图片执行全部步骤
+            let taskFailed = false
             for (let stepIdx = 0; stepIdx < stepChain.length; stepIdx++) {
                 const step = stepChain[stepIdx]!
-
                 if (taskFailed) break
 
                 if (rateLimiter.value) {
@@ -489,9 +486,14 @@ export function useSequentialPipeline() {
                 try {
                     const stepProgress = imageProgress + Math.floor((stepIdx / stepChain.length) * (90 / tasks.length))
                     reporter.setPercentage(stepProgress, `图片 ${imageIdx + 1}: ${STEP_LABELS[step]}`)
-
                     await executeStep(step, task)
                 } catch (err) {
+                    if (isTranslationCancellationError(err)) {
+                        imageStore.setTranslationStatus(task.imageIndex, 'cancelled', '翻译已取消')
+                        cancelled++
+                        throw err
+                    }
+
                     const msg = err instanceof Error ? err.message : '未知错误'
                     errors.push(`图片 ${task.imageIndex + 1}: ${step} - ${msg}`)
                     imageStore.setTranslationStatus(task.imageIndex, 'failed', msg)
@@ -500,15 +502,13 @@ export function useSequentialPipeline() {
                 }
             }
 
-            // 这张图片处理完成，立即更新 store
             if (!taskFailed) {
                 updateImageStore(task)
                 completed++
-                console.log(`✅ 图片 ${imageIdx + 1}/${tasks.length} 处理完成`)
             }
         }
 
-        return { completed, failed }
+        return { completed, failed, cancelled }
     }
 
     /**
@@ -529,52 +529,42 @@ export function useSequentialPipeline() {
         stepChain: AtomicStepType[],
         config: PipelineConfig,
         errors: string[]
-    ): Promise<{ completed: number; failed: number }> {
+    ): Promise<{ completed: number; failed: number; cancelled: number }> {
         let completed = 0
         let failed = 0
+        let cancelled = 0
 
         const batchSize = getBatchSize(config.mode)
         const totalBatches = Math.ceil(tasks.length / batchSize)
-
-        // 找到 aiTranslate 步骤的位置
         const aiTranslateIdx = stepChain.indexOf('aiTranslate')
         const stepsBeforeAi = aiTranslateIdx >= 0 ? stepChain.slice(0, aiTranslateIdx) : stepChain
         const stepsAfterAi = aiTranslateIdx >= 0 ? stepChain.slice(aiTranslateIdx + 1) : []
 
-        console.log(`📦 批次处理模式：共 ${tasks.length} 张图片，每批 ${batchSize} 张，共 ${totalBatches} 批`)
-        console.log(`   AI翻译前步骤: [${stepsBeforeAi.join(' → ')}]`)
-        console.log(`   AI翻译后步骤: [${stepsAfterAi.join(' → ')}]`)
-
         for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
-            // 检查是否取消
-            if (config.scope === 'all' && !imageStore.isBatchTranslationInProgress) {
-                console.log(`⏹️ 批量翻译已取消，停止处理`)
+            const batchStart = batchIdx * batchSize
+            if ((config.scope === 'all' || config.scope === 'range' || config.scope === 'failed') && !imageStore.isBatchTranslationInProgress) {
+                cancelled += tasks.length - batchStart
+                for (let i = batchStart; i < tasks.length; i++) {
+                    imageStore.setTranslationStatus(tasks[i]!.imageIndex, 'cancelled', '翻译已取消')
+                }
                 break
             }
 
-            const batchStart = batchIdx * batchSize
             const batchEnd = Math.min(batchStart + batchSize, tasks.length)
             const batchTasks = tasks.slice(batchStart, batchEnd)
-
             const batchProgress = Math.floor((batchIdx / totalBatches) * 90)
             reporter.setPercentage(batchProgress, `处理批次 ${batchIdx + 1}/${totalBatches}`)
-            toast.info(`处理批次 ${batchIdx + 1}/${totalBatches}（图片 ${batchStart + 1}-${batchEnd}）...`)
 
-            // 标记批次内图片为处理中
             for (const task of batchTasks) {
                 imageStore.setTranslationStatus(task.imageIndex, 'processing')
             }
 
-            // 跟踪批次内失败的任务索引
             const batchFailedIndices = new Set<number>()
 
-            // ========== 阶段1：逐张执行 aiTranslate 之前的步骤 ==========
             for (let i = 0; i < batchTasks.length; i++) {
                 const task = batchTasks[i]!
-
                 for (const step of stepsBeforeAi) {
                     if (batchFailedIndices.has(task.imageIndex)) break
-
                     if (rateLimiter.value) {
                         await rateLimiter.value.acquire()
                     }
@@ -584,6 +574,13 @@ export function useSequentialPipeline() {
                         reporter.setPercentage(stepProgress, `图片 ${batchStart + i + 1}: ${STEP_LABELS[step]}`)
                         await executeStep(step, task)
                     } catch (err) {
+                        if (isTranslationCancellationError(err)) {
+                            imageStore.setTranslationStatus(task.imageIndex, 'cancelled', '翻译已取消')
+                            batchFailedIndices.add(task.imageIndex)
+                            cancelled++
+                            throw err
+                        }
+
                         const msg = err instanceof Error ? err.message : '未知错误'
                         errors.push(`图片 ${task.imageIndex + 1}: ${step} - ${msg}`)
                         imageStore.setTranslationStatus(task.imageIndex, 'failed', msg)
@@ -592,20 +589,27 @@ export function useSequentialPipeline() {
                 }
             }
 
-            // ========== 阶段2：批量执行 aiTranslate ==========
             if (aiTranslateIdx >= 0) {
-                const stepProgress = batchProgress + 40
-                reporter.setPercentage(stepProgress, `批次 ${batchIdx + 1}: ${STEP_LABELS['aiTranslate']}`)
-
                 try {
                     const validTasks = batchTasks.filter(t => !batchFailedIndices.has(t.imageIndex))
                     if (validTasks.length > 0) {
+                        reporter.setPercentage(batchProgress + 40, `批次 ${batchIdx + 1}: ${STEP_LABELS.aiTranslate}`)
                         await stepAiTranslate(validTasks)
                     }
                 } catch (err) {
+                    if (isTranslationCancellationError(err)) {
+                        for (const task of batchTasks) {
+                            if (!batchFailedIndices.has(task.imageIndex)) {
+                                imageStore.setTranslationStatus(task.imageIndex, 'cancelled', '翻译已取消')
+                                batchFailedIndices.add(task.imageIndex)
+                                cancelled++
+                            }
+                        }
+                        throw err
+                    }
+
                     const msg = err instanceof Error ? err.message : '未知错误'
                     errors.push(`批次 ${batchIdx + 1} AI翻译失败: ${msg}`)
-                    // AI翻译失败，标记所有未失败的任务为失败
                     for (const task of batchTasks) {
                         if (!batchFailedIndices.has(task.imageIndex)) {
                             imageStore.setTranslationStatus(task.imageIndex, 'failed', msg)
@@ -615,15 +619,12 @@ export function useSequentialPipeline() {
                 }
             }
 
-            // ========== 阶段3：逐张执行 aiTranslate 之后的步骤 ==========
             for (let i = 0; i < batchTasks.length; i++) {
                 const task = batchTasks[i]!
-
                 if (batchFailedIndices.has(task.imageIndex)) continue
 
                 for (const step of stepsAfterAi) {
                     if (batchFailedIndices.has(task.imageIndex)) break
-
                     if (rateLimiter.value) {
                         await rateLimiter.value.acquire()
                     }
@@ -633,6 +634,13 @@ export function useSequentialPipeline() {
                         reporter.setPercentage(stepProgress, `图片 ${batchStart + i + 1}: ${STEP_LABELS[step]}`)
                         await executeStep(step, task)
                     } catch (err) {
+                        if (isTranslationCancellationError(err)) {
+                            imageStore.setTranslationStatus(task.imageIndex, 'cancelled', '翻译已取消')
+                            batchFailedIndices.add(task.imageIndex)
+                            cancelled++
+                            throw err
+                        }
+
                         const msg = err instanceof Error ? err.message : '未知错误'
                         errors.push(`图片 ${task.imageIndex + 1}: ${step} - ${msg}`)
                         imageStore.setTranslationStatus(task.imageIndex, 'failed', msg)
@@ -640,39 +648,34 @@ export function useSequentialPipeline() {
                     }
                 }
 
-                // 这张图片处理完成（aiTranslate 后的步骤都完成了），立即更新 store
                 if (!batchFailedIndices.has(task.imageIndex)) {
                     updateImageStore(task)
                     completed++
-                    console.log(`✅ 图片 ${batchStart + i + 1} 处理完成`)
                 }
             }
 
-            // 统计失败数量
-            failed += batchFailedIndices.size
-
-            console.log(`✅ 批次 ${batchIdx + 1}/${totalBatches} 处理完成`)
+            failed += batchTasks.filter(task => imageStore.images[task.imageIndex]?.translationStatus === 'failed').length
         }
 
-        return { completed, failed }
+        return { completed, failed, cancelled }
     }
 
     async function execute(config: PipelineConfig): Promise<PipelineResult> {
         if (!validateConfig(config)) {
-            return { success: false, completed: 0, failed: 0, errors: ['配置验证失败'] }
+            return { success: false, completed: 0, failed: 0, cancelled: 0, errors: ['Invalid configuration'] }
         }
 
         const images = imageStore.images
         if (images.length === 0) {
-            toast.error('请先上传图片')
-            return { success: false, completed: 0, failed: 0, errors: ['没有图片'] }
+            toast.error('Please upload images first')
+            return { success: false, completed: 0, failed: 0, cancelled: 0, errors: ['No images'] }
         }
 
         currentMode = config.mode
         const usePerImageMode = shouldUsePerImageMode(config.mode)
 
         isExecuting.value = true
-        if (config.scope === 'all' || config.scope === 'failed') {
+        if (config.scope === 'all' || config.scope === 'failed' || config.scope === 'range') {
             imageStore.setBatchTranslationInProgress(true)
         }
         initRateLimiter()
@@ -681,10 +684,7 @@ export function useSequentialPipeline() {
         const imagesToProcess = getImagesToProcess(config)
         const errors: string[] = []
 
-        // 【修复】批量翻译开始时，将当前文字设置预先写入到所有待翻译的图片
-        // 这样用户在翻译过程中切换图片时，侧边栏不会显示默认值，翻译也不会受影响
         if (savedTextStyles && imagesToProcess.length > 1) {
-            console.log(`📝 预分发文字设置到 ${imagesToProcess.length} 张待翻译图片...`)
             for (const { index } of imagesToProcess) {
                 imageStore.updateImageByIndex(index, {
                     fontSize: savedTextStyles.fontSize,
@@ -702,33 +702,20 @@ export function useSequentialPipeline() {
             }
         }
 
-        // 判断是否启用自动保存（书架模式 + 设置开启）
         const enableAutoSave = shouldEnableAutoSave()
+        const stepChain = [...STEP_CHAIN_CONFIGS[config.mode]]
 
-        // 动态生成步骤链
-        let stepChain = [...STEP_CHAIN_CONFIGS[config.mode]]
-
-        // 消除文字模式：根据设置决定是否包含 OCR 步骤
         if (config.mode === 'removeText' && settingsStore.settings.removeTextWithOcr) {
-            // 在 detection 后插入 ocr 步骤: ['detection', 'ocr', 'inpaint', 'render']
             const detectionIdx = stepChain.indexOf('detection')
             if (detectionIdx !== -1) {
                 stepChain.splice(detectionIdx + 1, 0, 'ocr')
             }
         }
 
-        // 如果启用自动保存，追加 save 步骤
         if (enableAutoSave) {
             stepChain.push('save')
         }
 
-        console.log(`🚀 顺序管线启动`)
-        console.log(`   模式: ${config.mode}`)
-        console.log(`   处理方式: ${usePerImageMode ? '逐张处理' : '批次处理'}`)
-        console.log(`   步骤链: [${stepChain.join(' → ')}]`)
-        console.log(`   自动保存: ${enableAutoSave ? '启用' : '禁用'}`)
-
-        // 创建任务状态
         const tasks: TaskState[] = imagesToProcess.map(({ image, index }) => {
             const task: TaskState = {
                 imageIndex: index,
@@ -737,7 +724,7 @@ export function useSequentialPipeline() {
                 bubbleAngles: [],
                 bubblePolygons: [],
                 autoDirections: [],
-                textMask: image.textMask || undefined, // 【重要】从图片中恢复精确文字掩膜
+                textMask: image.textMask || undefined,
                 textlinesPerBubble: [],
                 originalTexts: [],
                 colors: [],
@@ -745,7 +732,6 @@ export function useSequentialPipeline() {
                 textboxTexts: []
             }
 
-            // 校对模式需要从已有数据初始化
             if (config.mode === 'proofread' && image.bubbleStates && image.bubbleStates.length > 0) {
                 task.bubbleCoords = image.bubbleStates.map(s => s.coords)
                 task.bubbleAngles = image.bubbleStates.map(s => s.rotationAngle || 0)
@@ -759,7 +745,6 @@ export function useSequentialPipeline() {
                     autoFgColor: s.autoFgColor || null,
                     autoBgColor: s.autoBgColor || null
                 }))
-                // 使用已有的干净背景图
                 if (image.cleanImageData) {
                     task.cleanImage = image.cleanImageData
                 }
@@ -769,75 +754,112 @@ export function useSequentialPipeline() {
         })
 
         try {
-            reporter.init(imagesToProcess.length, `${config.mode} 模式启动...`)
+            reporter.init(imagesToProcess.length, `${config.mode} started...`)
 
-            // 如果启用自动保存，先执行预保存（保存所有原始图片）
             if (enableAutoSave) {
-                reporter.setPercentage(0, '预保存原始图片...')
+                reporter.setPercentage(0, 'Preparing originals...')
                 const preSaveSuccess = await preSaveOriginalImages({
                     onStart: (total) => {
-                        reporter.setPercentage(0, `预保存原始图片 0/${total}...`)
+                        reporter.setPercentage(0, `Preparing originals 0/${total}...`)
                     },
                     onProgress: (current, total) => {
-                        const percent = Math.round((current / total) * 10) // 预保存占 0-10%
-                        reporter.setPercentage(percent, `预保存原始图片 ${current}/${total}...`)
+                        const percent = Math.round((current / total) * 10)
+                        reporter.setPercentage(percent, `Preparing originals ${current}/${total}...`)
                     },
                     onComplete: () => {
-                        reporter.setPercentage(10, '预保存完成，开始翻译...')
+                        reporter.setPercentage(10, 'Preparation done, starting translation...')
                     },
                     onError: (error) => {
-                        reporter.setPercentage(0, `预保存失败: ${error}`)
+                        reporter.setPercentage(0, `Preparation failed: ${error}`)
                     }
                 })
                 if (!preSaveSuccess) {
-                    // 预保存失败，提示用户但不阻止翻译
-                    toast.warning('预保存失败，翻译完成后请手动保存')
+                    toast.warning('Preparation failed, please save manually after translation')
                 }
             }
 
-            let result: { completed: number; failed: number }
+            let result: { completed: number; failed: number; cancelled: number }
 
             if (usePerImageMode) {
-                // 逐张处理模式
                 result = await executePerImageMode(tasks, stepChain, config, errors)
             } else {
-                // 批次处理模式
                 result = await executeBatchMode(tasks, stepChain, config, errors)
             }
 
-            reporter.setPercentage(100, '完成！')
+            reporter.setPercentage(100, result.cancelled > 0 ? 'Cancelled' : 'Completed')
 
             const modeLabels: Record<TranslationMode, string> = {
-                standard: '翻译',
-                hq: '高质量翻译',
-                proofread: 'AI校对',
-                removeText: '消除文字'
+                standard: 'Translation',
+                hq: 'HQ Translation',
+                proofread: 'AI Proofread',
+                removeText: 'Remove Text'
             }
-            toast.success(`${modeLabels[config.mode]}完成！`)
 
-            return {
-                success: result.failed === 0,
+            if (result.cancelled > 0) {
+                toast.warning(`${modeLabels[config.mode]} cancelled: success ${result.completed}, failed ${result.failed}, cancelled ${result.cancelled}`)
+            } else {
+                toast.success(`${modeLabels[config.mode]} completed!`)
+            }
+
+            imageStore.finishBatchTranslation({
+                status: result.cancelled > 0 ? 'cancelled' : result.failed > 0 ? 'failed' : 'completed',
                 completed: result.completed,
                 failed: result.failed,
+                cancelled: result.cancelled,
+                total: imagesToProcess.length
+            })
+
+            return {
+                success: result.failed === 0 && result.cancelled === 0,
+                completed: result.completed,
+                failed: result.failed,
+                cancelled: result.cancelled,
+                wasCancelled: result.cancelled > 0,
                 errors: errors.length > 0 ? errors : undefined
             }
-
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '执行失败'
+            if (isTranslationCancellationError(error)) {
+                const completed = imagesToProcess.filter(img => imageStore.images[img.index]?.translationStatus === 'completed').length
+                const failed = imagesToProcess.filter(img => imageStore.images[img.index]?.translationStatus === 'failed').length
+                const cancelled = imagesToProcess.filter(img => imageStore.images[img.index]?.translationStatus === 'cancelled').length
+                imageStore.finishBatchTranslation({
+                    status: 'cancelled',
+                    completed,
+                    failed,
+                    cancelled,
+                    total: imagesToProcess.length
+                })
+                return {
+                    success: false,
+                    completed,
+                    failed,
+                    cancelled,
+                    wasCancelled: true,
+                    errors
+                }
+            }
+
+            const errorMessage = error instanceof Error ? error.message : 'Execution failed'
             toast.error(errorMessage)
             errors.push(errorMessage)
+            imageStore.finishBatchTranslation({
+                status: 'failed',
+                completed: 0,
+                failed: imagesToProcess.length,
+                cancelled: 0,
+                total: imagesToProcess.length
+            })
             return {
                 success: false,
                 completed: 0,
                 failed: imagesToProcess.length,
+                cancelled: 0,
                 errors
             }
-
         } finally {
             isExecuting.value = false
             imageStore.setBatchTranslationInProgress(false)
 
-            // 如果启用了自动保存，完成保存会话
             if (enableAutoSave) {
                 await finalizeSave()
             }
@@ -854,10 +876,11 @@ export function useSequentialPipeline() {
 
     function cancel(): void {
         if (imageStore.isBatchTranslationInProgress) {
+            imageStore.markBatchTranslationCancelling()
             imageStore.setBatchTranslationInProgress(false)
             // 重置自动保存状态
             resetSaveState()
-            toast.info('操作已取消')
+            toast.info('Operation cancelled')
         }
     }
 

@@ -6,6 +6,7 @@ import { parallelOcr, type ParallelOcrResponse } from '@/api/parallelTranslate'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { BubbleCoords } from '@/types/bubble'
 import type { ImageData as AppImageData } from '@/types/image'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 export interface OcrInput {
     imageIndex: number
@@ -28,6 +29,8 @@ export async function executeOcr(input: OcrInput): Promise<OcrOutput> {
     const settingsStore = useSettingsStore()
     const settings = settingsStore.settings
     const base64 = extractBase64(image.originalDataURL)
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     // PaddleOCR-VL 使用独立的源语言设置
     const ocrSourceLanguage = settings.ocrEngine === 'paddleocr_vl'
@@ -49,7 +52,7 @@ export async function executeOcr(input: OcrInput): Promise<OcrOutput> {
         ai_vision_ocr_prompt: settings.aiVisionOcr?.prompt,
         custom_ai_vision_base_url: settings.aiVisionOcr?.customBaseUrl,
         textlines_per_bubble: textlinesPerBubble
-    })
+    }, { signal })
 
     if (!response.success) {
         throw new Error(response.error || 'OCR失败')

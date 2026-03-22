@@ -419,6 +419,10 @@ async function handleRunWorkflow(payload: WorkflowRunRequest) {
   }
 }
 
+function handleCancelWorkflow() {
+  translation.cancelBatchTranslation()
+}
+
 /**
  * 删除当前图片
  * 对齐原版 events.js handleDeleteCurrent
@@ -655,6 +659,7 @@ function selectImage(index: number) {
       <!-- 左侧设置侧边栏组件 -->
       <SettingsSidebar
         @run-workflow="handleRunWorkflow"
+        @cancel-workflow="handleCancelWorkflow"
         @previous="goToPrevious"
         @next="goToNext"
         @apply-to-all="handleApplyToAll"

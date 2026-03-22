@@ -14,6 +14,7 @@ import type { ParallelProgressTracker } from '../ParallelProgressTracker'
 import { parallelTranslate } from '@/api/parallelTranslate'
 import { hqTranslateBatch, translateSingleText } from '@/api/translate'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../../core/cancellation'
 
 export class TranslatePool extends TaskPool {
   private mode: ParallelTranslationMode = 'standard'
@@ -60,6 +61,8 @@ export class TranslatePool extends TaskPool {
   private async handleStandardTranslate(task: PipelineTask): Promise<PipelineTask> {
     const settingsStore = useSettingsStore()
     const settings = settingsStore.settings
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     if (!task.ocrResult || task.ocrResult.originalTexts.length === 0) {
       task.translateResult = { translatedTexts: [], textboxTexts: [] }
@@ -107,7 +110,7 @@ export class TranslatePool extends TaskPool {
             use_json_format: settings.translation.isJsonMode,  // 传递 JSON 模式设置
             rpm_limit_translation: settings.translation.rpmLimit,
             max_retries: settings.translation.maxRetries
-          })
+          }, { signal })
 
           if (response.success && response.data) {
             translatedTexts.push(response.data.translated_text || '')
@@ -128,7 +131,7 @@ export class TranslatePool extends TaskPool {
               prompt_content: settings.textboxPrompt,
               rpm_limit_translation: settings.translation.rpmLimit,
               max_retries: settings.translation.maxRetries
-            })
+            }, { signal })
 
             if (textboxResponse.success && textboxResponse.data) {
               textboxTexts.push(textboxResponse.data.translated_text || '')
@@ -164,7 +167,7 @@ export class TranslatePool extends TaskPool {
         rpm_limit: settings.translation.rpmLimit,
         max_retries: settings.translation.maxRetries,
         use_json_format: settings.translation.isJsonMode
-      })
+      }, { signal })
 
       if (!response.success) {
         throw new Error(response.error || '翻译失败')
@@ -187,6 +190,8 @@ export class TranslatePool extends TaskPool {
 
     const settingsStore = useSettingsStore()
     const { hqTranslation } = settingsStore.settings
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
     const batchSize = hqTranslation.batchSize || 3
     const isLastBatch = this.processedCount >= this.totalTasks
     const batchReady = this.batchBuffer.length >= batchSize || isLastBatch
@@ -234,7 +239,7 @@ export class TranslatePool extends TaskPool {
       no_thinking_method: hqTranslation.noThinkingMethod,
       use_stream: hqTranslation.useStream,
       max_retries: hqTranslation.maxRetries || 2
-    })
+    }, { signal })
 
     // 4. 解析结果
     const translatedData = this.parseHqResponse(response, hqTranslation.forceJsonOutput)
@@ -271,6 +276,8 @@ export class TranslatePool extends TaskPool {
 
     const settingsStore = useSettingsStore()
     const { proofreading, useTextboxPrompt } = settingsStore.settings
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
     const batchSize = proofreading.rounds[0]?.batchSize || 3
     const isLastBatch = this.processedCount >= this.totalTasks
     const batchReady = this.batchBuffer.length >= batchSize || isLastBatch
@@ -331,7 +338,7 @@ export class TranslatePool extends TaskPool {
         no_thinking_method: round.noThinkingMethod,
         use_stream: round.useStream ?? true,
         max_retries: round.maxRetries || proofreading.maxRetries || 2
-      })
+      }, { signal })
 
       const parsedResult = this.parseHqResponse(response, round.forceJsonOutput)
       if (parsedResult) {

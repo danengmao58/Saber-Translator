@@ -150,6 +150,8 @@ export class ParallelPipeline {
     return {
       success: result.success,
       failed: result.failed,
+      cancelled: result.cancelled,
+      wasCancelled: this.isCancelled,
       errors: this.resultCollector.getFailed().map(t => t.error || '未知错误')
     }
   }

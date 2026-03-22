@@ -8,6 +8,7 @@ import { parallelRender, type ParallelRenderResponse } from '@/api/parallelTrans
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { BubbleState, BubbleCoords } from '@/types/bubble'
 import type { SavedTextStyles } from '../types'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 export interface RenderInput {
     imageIndex: number
@@ -57,6 +58,8 @@ export async function executeRender(input: RenderInput): Promise<RenderOutput> {
 
     const settingsStore = useSettingsStore()
     const { textStyle } = settingsStore.settings
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     // 【简化设计】计算 textDirection：
     // - 如果全局设置是 'auto'，使用检测结果
@@ -126,7 +129,7 @@ export async function executeRender(input: RenderInput): Promise<RenderOutput> {
         strokeWidth: savedTextStyles?.strokeWidth || textStyle.strokeWidth,
         autoFontSize: savedTextStyles?.autoFontSize ?? textStyle.autoFontSize,
         use_individual_styles: true
-    })
+    }, { signal })
 
     if (!response.success) {
         throw new Error(response.error || '渲染失败')

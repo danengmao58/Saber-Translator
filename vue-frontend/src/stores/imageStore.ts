@@ -15,6 +15,15 @@ import {
   DEFAULT_STROKE_WIDTH
 } from '@/constants'
 
+export interface BatchTranslationSummary {
+  status: 'idle' | 'running' | 'cancelling' | 'completed' | 'cancelled' | 'failed'
+  mode: string | null
+  total: number
+  completed: number
+  failed: number
+  cancelled: number
+}
+
 /**
  * 生成唯一 ID
  */
@@ -87,6 +96,14 @@ export const useImageStore = defineStore('image', () => {
 
   /** 批量翻译是否正在进行 */
   const isBatchTranslationInProgress = ref<boolean>(false)
+  const batchTranslationSummary = ref<BatchTranslationSummary>({
+    status: 'idle',
+    mode: null,
+    total: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0
+  })
 
   // ============================================================
   // 计算属性
@@ -117,6 +134,10 @@ export const useImageStore = defineStore('image', () => {
   /** 翻译失败的图片数量 */
   const failedImageCount = computed<number>(
     () => images.value.filter((img) => img.translationFailed).length
+  )
+
+  const cancelledImageCount = computed<number>(
+    () => images.value.filter((img) => img.translationStatus === 'cancelled').length
   )
 
   /** 已完成翻译的图片数量 */
@@ -256,6 +277,14 @@ export const useImageStore = defineStore('image', () => {
     images.value = []
     currentImageIndex.value = -1
     isBatchTranslationInProgress.value = false
+    batchTranslationSummary.value = {
+      status: 'idle',
+      mode: null,
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0
+    }
     console.log('所有图片已清除')
   }
 
@@ -512,6 +541,41 @@ export const useImageStore = defineStore('image', () => {
     console.log(`批量翻译状态: ${isInProgress ? '进行中' : '已完成'}`)
   }
 
+  function startBatchTranslation(mode: string, total: number): void {
+    batchTranslationSummary.value = {
+      status: 'running',
+      mode,
+      total,
+      completed: 0,
+      failed: 0,
+      cancelled: 0
+    }
+  }
+
+  function markBatchTranslationCancelling(): void {
+    if (batchTranslationSummary.value.status === 'running') {
+      batchTranslationSummary.value.status = 'cancelling'
+    }
+  }
+
+  function finishBatchTranslation(summary: Partial<BatchTranslationSummary>): void {
+    batchTranslationSummary.value = {
+      ...batchTranslationSummary.value,
+      ...summary
+    }
+  }
+
+  function resetBatchTranslationSummary(): void {
+    batchTranslationSummary.value = {
+      status: 'idle',
+      mode: null,
+      total: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0
+    }
+  }
+
   /**
    * 获取所有失败的图片索引
    * @returns 失败图片的索引数组
@@ -531,6 +595,7 @@ export const useImageStore = defineStore('image', () => {
     images,
     currentImageIndex,
     isBatchTranslationInProgress,
+    batchTranslationSummary,
 
     // 计算属性
     currentImage,
@@ -539,6 +604,7 @@ export const useImageStore = defineStore('image', () => {
     canGoPrevious,
     canGoNext,
     failedImageCount,
+    cancelledImageCount,
     completedImageCount,
     pendingImageCount,
 
@@ -572,6 +638,10 @@ export const useImageStore = defineStore('image', () => {
 
     // 批量翻译状态管理方法
     setBatchTranslationInProgress,
+    startBatchTranslation,
+    markBatchTranslationCancelling,
+    finishBatchTranslation,
+    resetBatchTranslationSummary,
     getFailedImageIndices
   }
 })

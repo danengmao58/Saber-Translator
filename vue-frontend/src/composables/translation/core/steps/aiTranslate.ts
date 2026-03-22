@@ -14,6 +14,7 @@
 import { hqTranslateBatch } from '@/api/translate'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { ImageData } from '@/types/image'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 // ============================================================
 // 类型定义
@@ -68,6 +69,8 @@ export async function executeAiTranslate(input: AiTranslateInput): Promise<AiTra
     const settingsStore = useSettingsStore()
     const settings = settingsStore.settings
     const isProofread = input.mode === 'proofread'
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     // 1. 收集 JSON 数据
     const jsonData: TranslationJsonData[] = input.tasks.map(t => {
@@ -139,7 +142,7 @@ export async function executeAiTranslate(input: AiTranslateInput): Promise<AiTra
         no_thinking_method: isProofread ? roundConfig?.noThinkingMethod : hqConfig.noThinkingMethod,
         use_stream: isProofread ? (roundConfig?.useStream ?? true) : hqConfig.useStream,
         max_retries: isProofread ? (settings.proofreading.maxRetries || 2) : (hqConfig.maxRetries || 2)
-    })
+    }, { signal })
 
     // 5. 解析结果
     const forceJson = isProofread ? (roundConfig?.forceJsonOutput || false) : hqConfig.forceJsonOutput
@@ -169,7 +172,7 @@ export async function executeAiTranslate(input: AiTranslateInput): Promise<AiTra
                 no_thinking_method: round.noThinkingMethod,
                 use_stream: round.useStream ?? true,
                 max_retries: round.maxRetries || settings.proofreading.maxRetries || 2
-            })
+            }, { signal })
 
             const roundResult = parseHqResponse(roundResponse, round.forceJsonOutput)
             if (roundResult) {

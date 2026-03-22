@@ -6,6 +6,7 @@ import { parallelInpaint, type ParallelInpaintResponse } from '@/api/parallelTra
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { BubbleCoords } from '@/types/bubble'
 import type { ImageData as AppImageData } from '@/types/image'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 export interface InpaintInput {
     imageIndex: number
@@ -31,6 +32,8 @@ export async function executeInpaint(input: InpaintInput): Promise<InpaintOutput
     const settings = settingsStore.settings
     const { textStyle, preciseMask } = settings
     const base64 = extractBase64(image.originalDataURL)
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     // ✅ 分别发送 textMask 和 userMask，由后端合并处理
     console.log(`修复步骤 - textMask: ${textMask ? '✅' : '❌'}, userMask: ${userMask ? '✅' : '❌'}`)
@@ -46,7 +49,7 @@ export async function executeInpaint(input: InpaintInput): Promise<InpaintOutput
         fill_color: textStyle.fillColor,
         mask_dilate_size: preciseMask.dilateSize,
         mask_box_expand_ratio: preciseMask.boxExpandRatio
-    })
+    }, { signal })
 
     if (!response.success) {
         throw new Error(response.error || '背景修复失败')

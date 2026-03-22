@@ -8,7 +8,7 @@ import type { BubbleState, BubbleCoords, TextDirection, InpaintMethod } from './
 /**
  * 翻译状态
  */
-export type TranslationStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type TranslationStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
 
 /**
  * 图片数据接口

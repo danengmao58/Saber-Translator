@@ -10,6 +10,7 @@
 import type { PipelineTask } from './types'
 import type { DeepLearningLock } from './DeepLearningLock'
 import type { ParallelProgressTracker } from './ParallelProgressTracker'
+import { isTranslationCancellationError } from '../core/cancellation'
 
 export abstract class TaskPool {
   protected queue: PipelineTask[] = []
@@ -118,14 +119,14 @@ export abstract class TaskPool {
 
       // 传递给下一个池子
       // 注意：status为'buffered'表示任务被缓冲等待批量处理，不自动传递
-      if (this.nextPool && result.status !== 'failed' && result.status !== 'buffered') {
+      if (this.nextPool && result.status !== 'failed' && result.status !== 'buffered' && result.status !== 'cancelled') {
         this.nextPool.enqueue(result)
       }
 
       this.onTaskComplete?.(result)
 
     } catch (error) {
-      this.currentTask.status = 'failed'
+      this.currentTask.status = isTranslationCancellationError(error) ? 'cancelled' : 'failed'
       this.currentTask.error = (error as Error).message
       console.error(`[${this.name}] 处理任务失败:`, error)
       this.onTaskComplete?.(this.currentTask)
@@ -173,7 +174,13 @@ export abstract class TaskPool {
    */
   cancel(): void {
     this.isCancelled = true
-    this.queue = []
+    const cancelledTasks = this.queue.splice(0)
+    for (const task of cancelledTasks) {
+      task.status = 'cancelled'
+      task.error = '翻译已取消'
+      this.onTaskComplete?.(task)
+    }
+    this.progressTracker.updatePool(this.name, { waiting: 0 })
   }
 
   /**

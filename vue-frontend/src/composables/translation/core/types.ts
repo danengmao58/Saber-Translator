@@ -80,6 +80,8 @@ export interface PipelineResult {
     success: boolean
     completed: number
     failed: number
+    cancelled?: number
+    wasCancelled?: boolean
     errors?: string[]
 }
 

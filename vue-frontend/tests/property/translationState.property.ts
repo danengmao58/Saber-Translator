@@ -47,7 +47,8 @@ describe('翻译状态管理属性测试', () => {
     'pending',
     'processing',
     'completed',
-    'failed'
+    'failed',
+    'cancelled'
   )
 
   /**
@@ -240,6 +241,30 @@ describe('翻译状态管理属性测试', () => {
         }
       ),
       { numRuns: 100 }
+    )
+  })
+
+  it('取消状态会被正确统计', () => {
+    fc.assert(
+      fc.property(
+        fc.array(validImageDataArb, { minLength: 1, maxLength: 10 }),
+        fc.array(fc.boolean(), { minLength: 1, maxLength: 10 }),
+        (imagesData, cancelledFlagsRaw) => {
+          setActivePinia(createPinia())
+          const store = useImageStore()
+          const cancelledFlags = cancelledFlagsRaw.slice(0, imagesData.length)
+
+          imagesData.forEach((imageData, index) => {
+            store.addImage(imageData.originalDataURL, imageData.fileName)
+            if (cancelledFlags[index]) {
+              store.setTranslationStatus(index, 'cancelled')
+            }
+          })
+
+          return store.cancelledImageCount === cancelledFlags.filter(Boolean).length
+        }
+      ),
+      { numRuns: 50 }
     )
   })
 

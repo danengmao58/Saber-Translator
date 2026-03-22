@@ -13,7 +13,7 @@ export type ParallelTranslationMode = 'standard' | 'hq' | 'proofread' | 'removeT
 /**
  * 任务状态
  */
-export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'buffered'
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'buffered' | 'cancelled'
 
 /**
  * 流水线任务
@@ -149,5 +149,7 @@ export interface TranslationJsonData {
 export interface ParallelExecutionResult {
   success: number
   failed: number
+  cancelled: number
+  wasCancelled?: boolean
   errors?: string[]
 }

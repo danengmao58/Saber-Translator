@@ -113,6 +113,10 @@ export class ParallelProgressTracker {
     this.progress.totalFailed++
   }
 
+  incrementCancelled(): void {
+    this.progress.totalFailed++
+  }
+
   /**
    * 更新预计剩余时间
    */

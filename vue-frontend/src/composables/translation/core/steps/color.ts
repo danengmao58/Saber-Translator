@@ -5,6 +5,7 @@
 import { parallelColor, type ParallelColorResponse } from '@/api/parallelTranslate'
 import type { BubbleCoords } from '@/types/bubble'
 import type { ImageData as AppImageData } from '@/types/image'
+import { getTranslationAbortSignal, throwIfTranslationCancelled } from '../cancellation'
 
 export interface ColorInput {
     imageIndex: number
@@ -30,12 +31,14 @@ export async function executeColor(input: ColorInput): Promise<ColorOutput> {
     }
 
     const base64 = extractBase64(image.originalDataURL)
+    const signal = getTranslationAbortSignal()
+    throwIfTranslationCancelled(signal)
 
     const response: ParallelColorResponse = await parallelColor({
         image: base64,
         bubble_coords: bubbleCoords,
         textlines_per_bubble: textlinesPerBubble
-    })
+    }, { signal })
 
     if (!response.success) {
         throw new Error(response.error || '颜色提取失败')
