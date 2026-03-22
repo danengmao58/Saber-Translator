@@ -1037,6 +1037,7 @@ function selectImage(index: number) {
   border-radius: 20px;
   color: #2c3e50;
   text-decoration: none;
+  font-size: 0.9em;
   transition: all 0.3s ease;
 }
 
@@ -1061,6 +1062,7 @@ function selectImage(index: number) {
   border-radius: 20px;
   color: #e91e63;
   text-decoration: none;
+  font-size: 0.9em;
   transition: all 0.3s ease;
 }
 

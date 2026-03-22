@@ -695,7 +695,7 @@ function handleRunWorkflow() {
       <!-- 文字设置折叠面板 -->
       <CollapsiblePanel
         title="文字设置"
-        :default-expanded="true"
+        :default-expanded="false"
         class="settings-panel text-settings-panel"
       >
         <div class="settings-form text-settings-form">
