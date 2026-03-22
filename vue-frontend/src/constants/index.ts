@@ -330,6 +330,7 @@ export const TRANSLATE_PROVIDERS = [
   { value: 'caiyun', label: '彩云小译', type: 'cloud' },
   { value: 'baidu_translate', label: '百度翻译', type: 'cloud' },
   { value: 'youdao_translate', label: '有道翻译', type: 'cloud' },
+  { value: 'deepl', label: 'DeepL', type: 'cloud' },
   { value: 'gemini', label: 'Google Gemini', type: 'cloud' },
   { value: 'ollama', label: 'Ollama (本地)', type: 'local' },
   { value: 'sakura', label: 'Sakura (本地)', type: 'local' },

@@ -30,6 +30,7 @@ const PROVIDERS_REQUIRING_API_KEY: TranslationProvider[] = [
   'baidu_translate',
   'youdao_translate',
   'gemini',
+  'deepl',
   'custom_openai'
 ]
 
@@ -58,6 +59,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   caiyun: '彩云小译',
   baidu_translate: '百度翻译',
   youdao_translate: '有道翻译',
+  deepl: 'DeepL',
   gemini: 'Google Gemini',
   custom_openai: '自定义 OpenAI',
   ollama: 'Ollama',
@@ -266,9 +268,10 @@ export function useValidation() {
       }
     }
 
-    // 检查模型名称
+    // 检查模型名称（部分服务不需要模型名称，如 DeepL）
+    const providersRequiringModelName = ['siliconflow', 'deepseek', 'volcano', 'gemini', 'custom_openai', 'baidu_translate', 'youdao_translate']
     if (!modelName || modelName.trim() === '') {
-      if (isLocalProvider(provider) || requiresApiKey(provider)) {
+      if (isLocalProvider(provider) || providersRequiringModelName.includes(provider)) {
         missingItems.push(`${getProviderDisplayName(provider)} 的模型名称`)
       }
     }

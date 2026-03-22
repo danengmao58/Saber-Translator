@@ -26,6 +26,7 @@ export type TranslationProvider =
   | 'baidu_translate'
   | 'youdao_translate'
   | 'gemini'
+  | 'deepl'
   | 'ollama'
   | 'sakura'
   | 'custom_openai'

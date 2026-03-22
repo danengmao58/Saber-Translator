@@ -44,8 +44,8 @@
         />
       </div>
 
-      <!-- 模型名称 (非本地服务显示) -->
-      <div v-show="!isLocalProvider" class="settings-item">
+      <!-- 模型名称 (非本地服务，且部分服务需要模型名) -->
+      <div v-show="showModelName" class="settings-item">
         <label for="settingsModelName">{{ modelNameLabel }}:</label>
         <div class="model-input-with-fetch">
           <input
@@ -243,6 +243,7 @@ const providerOptions = [
   { label: '彩云小译', value: 'caiyun' },
   { label: '百度翻译', value: 'baidu_translate' },
   { label: '有道翻译', value: 'youdao_translate' },
+  { label: 'DeepL', value: 'deepl' },
   { label: 'Google Gemini', value: 'gemini' },
   { label: 'Ollama (本地)', value: 'ollama' },
   { label: 'Sakura (本地)', value: 'sakura' },
@@ -324,7 +325,12 @@ const isLocalProvider = computed(() => {
 
 // 计算属性：是否显示RPM限制
 const showRpmLimit = computed(() => {
-  return !['ollama', 'sakura', 'caiyun', 'baidu_translate', 'youdao_translate'].includes(localSettings.value.modelProvider)
+  return !['ollama', 'sakura'].includes(localSettings.value.modelProvider)
+})
+
+// 计算属性：是否显示模型名称输入框
+const showModelName = computed(() => {
+  return !['ollama', 'sakura', 'deepl'].includes(localSettings.value.modelProvider)
 })
 
 // 计算属性：是否支持获取模型列表
@@ -341,6 +347,8 @@ const apiKeyLabel = computed(() => {
       return 'App Key'
     case 'caiyun':
       return 'API Token'
+    case 'deepl':
+      return 'DeepL Auth Key'
     default:
       return 'API Key'
   }
@@ -355,6 +363,8 @@ const apiKeyPlaceholder = computed(() => {
       return '请输入有道翻译应用ID'
     case 'caiyun':
       return '请输入彩云小译Token'
+    case 'deepl':
+      return '请输入DeepL Auth Key'
     default:
       return '请输入API Key'
   }
@@ -383,6 +393,8 @@ const modelNamePlaceholder = computed(() => {
       return '请输入有道翻译应用密钥'
     case 'caiyun':
       return '可选: auto/日语/英语'
+    case 'deepl':
+      return 'DeepL不需要模型名称，可留空'
     default:
       return '请输入模型名称'
   }
@@ -663,8 +675,8 @@ async function testCloudConnection() {
     return
   }
 
-  // 非彩云小译需要模型名称
-  if (provider !== 'caiyun' && !modelName) {
+  // 非彩云小译和非DeepL需要模型名称
+  if (provider !== 'caiyun' && provider !== 'deepl' && !modelName) {
     toast.warning('请填写模型名称')
     return
   }

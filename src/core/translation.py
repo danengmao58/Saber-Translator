@@ -18,10 +18,12 @@ if root_dir not in sys.path:
 from src.shared import constants
 from src.interfaces.baidu_translate_interface import BaiduTranslateInterface
 from src.interfaces.youdao_translate_interface import YoudaoTranslateInterface
+from src.interfaces.deepl_translate_interface import DeepLTranslateInterface
 
 # 全局API实例缓存
 baidu_translate = BaiduTranslateInterface()
 youdao_translate = YoudaoTranslateInterface()
+deepl_translate = DeepLTranslateInterface()
 
 logger = logging.getLogger("CoreTranslation")
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -313,7 +315,7 @@ def translate_single_text(text, target_language, model_provider,
                 
                 # 调用百度翻译接口
                 translated_text = baidu_translate.translate(text, from_lang, to_lang)
-            
+
             elif model_provider == constants.YOUDAO_TRANSLATE_ENGINE_ID:
                 # 有道翻译API
                 if not api_key or (isinstance(api_key, str) and not api_key.strip()):
@@ -331,6 +333,16 @@ def translate_single_text(text, target_language, model_provider,
                 
                 # 调用有道翻译接口
                 translated_text = youdao_translate.translate(text, from_lang, to_lang)
+
+            elif model_provider == constants.DEEPL_TRANSLATE_ENGINE_ID:
+                if not api_key or (isinstance(api_key, str) and not api_key.strip()):
+                    raise ValueError("DeepL 翻译需要 API Key")
+                deepl_translate.set_credentials(api_key)
+
+                # DeepL 不使用 model_name，使用 target_language 映射
+                target_lang = constants.PROJECT_TO_DEEPL_TRANSLATE_LANG_MAP.get(target_language, 'ZH')
+                source_lang = 'auto'
+                translated_text = deepl_translate.translate(text, target_lang=target_lang, source_lang=source_lang)
             elif model_provider.lower() == 'gemini':
                 if not api_key:
                     raise ValueError("Gemini 需要 API Key")

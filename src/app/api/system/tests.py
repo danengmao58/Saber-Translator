@@ -585,6 +585,15 @@ def test_ai_translate_connection():
         # 彩云小译特殊处理
         if provider == 'caiyun':
             return test_caiyun_connection(api_key)
+
+        if provider == 'deepl':
+            from src.interfaces.deepl_translate_interface import DeepLTranslateInterface
+            deepl = DeepLTranslateInterface(api_key)
+            success, message = deepl.test_connection()
+            if success:
+                return jsonify({'success': True, 'message': message})
+            else:
+                return jsonify({'success': False, 'message': message}), 500
         
         # 其他服务需要模型名称
         if not model_name:
