@@ -44,8 +44,8 @@
         />
       </div>
 
-      <!-- 模型名称 (非本地服务显示) -->
-      <div v-show="!isLocalProvider" class="settings-item">
+      <!-- 模型名称 (非本地服务且需要模型名) -->
+      <div v-show="showModelName" class="settings-item">
         <label for="settingsModelName">{{ modelNameLabel }}:</label>
         <div class="model-input-with-fetch">
           <input
@@ -347,6 +347,12 @@ const isLocalProvider = computed(() => {
   return isLocalProviderId(localSettings.value.modelProvider)
 })
 
+// 计算属性：是否显示模型名称输入框
+const showModelName = computed(() => {
+  const manifest = getProviderManifest(localSettings.value.modelProvider)
+  return manifest ? manifest.requiresModel : !isLocalProvider.value
+})
+
 // 计算属性：是否显示RPM限制
 const showRpmLimit = computed(() => {
   return providerSupportsRpmLimit(localSettings.value.modelProvider)
@@ -366,6 +372,8 @@ const apiKeyLabel = computed(() => {
       return 'App Key'
     case 'caiyun':
       return 'API Token'
+    case 'deepl':
+      return 'DeepL Auth Key'
     default:
       return 'API Key'
   }
@@ -380,6 +388,8 @@ const apiKeyPlaceholder = computed(() => {
       return '请输入有道翻译应用ID'
     case 'caiyun':
       return '请输入彩云小译Token'
+    case 'deepl':
+      return '请输入DeepL Auth Key'
     default:
       return '请输入API Key'
   }
@@ -394,6 +404,8 @@ const modelNameLabel = computed(() => {
       return 'App Secret'
     case 'caiyun':
       return '源语言 (可选)'
+    case 'deepl':
+      return 'DeepL Auth Key'
     default:
       return '模型名称'
   }
@@ -407,6 +419,9 @@ const modelNamePlaceholder = computed(() => {
     case 'youdao_translate':
       return '请输入有道翻译应用密钥'
     case 'caiyun':
+    case 'deepl':
+      return 'DeepL不需要模型名称，可留空'
+    default:
       return '可选: auto/日语/英语'
     default:
       return '请输入模型名称'
@@ -709,8 +724,8 @@ async function testCloudConnection() {
     return
   }
 
-  // 非彩云小译需要模型名称
-  if (provider !== 'caiyun' && !modelName) {
+  // 非彩云小译和DeepL需要模型名称
+  if (provider !== 'caiyun' && provider !== 'deepl' && !modelName) {
     toast.warning('请填写模型名称')
     return
   }

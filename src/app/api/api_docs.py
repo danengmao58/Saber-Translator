@@ -108,7 +108,7 @@ TRANSLATE_IMAGE_SPEC = {
                         "type": "string",
                         "description": "翻译模型提供商",
                         "default": "siliconflow",
-                        "enum": ["siliconflow", "deepseek", "ollama", "sakura", "baidu_translate"]
+                        "enum": ["siliconflow", "deepseek", "ollama", "sakura", "baidu_translate", "deepl"]
                     },
                     "api_key": {
                         "type": "string",

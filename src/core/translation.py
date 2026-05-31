@@ -46,10 +46,12 @@ from src.shared.openai_rate_limits import (
 )
 from src.interfaces.baidu_translate_interface import BaiduTranslateInterface
 from src.interfaces.youdao_translate_interface import YoudaoTranslateInterface
+from src.interfaces.deepl_translate_interface import DeepLTranslateInterface
 
 # 全局API实例缓存
 baidu_translate = BaiduTranslateInterface()
 youdao_translate = YoudaoTranslateInterface()
+deepl_translate = DeepLTranslateInterface()
 
 logger = logging.getLogger("CoreTranslation")
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -337,6 +339,14 @@ def translate_single_text(
                     if not model_name or (isinstance(model_name, str) and not model_name.strip()):
                         raise ValueError("有道翻译API需要AppSecret")
                     translated_text = translate_with_youdao(text, target_language, api_key, model_name)
+
+                elif canonical_provider == constants.DEEPL_TRANSLATE_ENGINE_ID:
+                    if not api_key or (isinstance(api_key, str) and not api_key.strip()):
+                        raise ValueError("DeepL 需要 API Key")
+                    deepl_translate.set_credentials(api_key)
+                    # DeepL 不使用 model_name，使用 target_language 映射
+                    target_lang = constants.PROJECT_TO_DEEPL_TRANSLATE_LANG_MAP.get(target_language, 'ZH')
+                    translated_text = deepl_translate.translate(text, target_lang=target_lang)
                 else:
                     raise ValueError(f"不支持的翻译服务提供商: {canonical_provider}")
 
