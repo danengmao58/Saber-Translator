@@ -418,10 +418,9 @@ const modelNamePlaceholder = computed(() => {
       return '请输入百度翻译App Key'
     case 'youdao_translate':
       return '请输入有道翻译应用密钥'
-    case 'caiyun':
     case 'deepl':
       return 'DeepL不需要模型名称，可留空'
-    default:
+    case 'caiyun':
       return '可选: auto/日语/英语'
     default:
       return '请输入模型名称'
