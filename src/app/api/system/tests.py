@@ -617,6 +617,20 @@ def test_ai_translate_connection():
                 })
             return jsonify({'success': False, 'message': f'连接失败: {result}'}), 500
         
+        # DeepL 特殊处理
+        if provider == 'deepl':
+            if not api_key:
+                return jsonify({
+                    'success': False,
+                    'message': '请提供API Key'
+                }), 400
+            from src.interfaces.deepl_translate_interface import DeepLTranslateInterface
+            deepl = DeepLTranslateInterface(api_key)
+            success, message = deepl.test_connection()
+            if success:
+                return jsonify({'success': True, 'message': message})
+            return jsonify({'success': False, 'message': message}), 500
+        
         # 其他服务需要模型名称
         if not model_name:
             return jsonify({

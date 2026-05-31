@@ -183,6 +183,23 @@ TEXTBOX_PROMPTS_FILE = 'textbox_prompts.json'
 BAIDU_TRANSLATE_ENGINE_ID = 'baidu_translate'
 # 有道翻译API引擎ID
 YOUDAO_TRANSLATE_ENGINE_ID = 'youdao_translate'
+# DeepL翻译API引擎ID
+DEEPL_TRANSLATE_ENGINE_ID = 'deepl'
+
+# 项目内部语言代码到 DeepL 语言代码的映射
+PROJECT_TO_DEEPL_TRANSLATE_LANG_MAP = {
+    'zh': 'ZH',
+    'en': 'EN',
+    'japan': 'JA',
+    'korean': 'KO',
+    'french': 'FR',
+    'german': 'DE',
+    'russian': 'RU',
+    'italian': 'IT',
+    'spanish': 'ES',
+    'portuguese': 'PT-PT',
+    'russian': 'RU'
+}
 
 # --- 文件与目录 ---
 # 默认字体路径现在指向 src/app/static/fonts/
