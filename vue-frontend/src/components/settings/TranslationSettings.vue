@@ -349,8 +349,7 @@ const isLocalProvider = computed(() => {
 
 // 计算属性：是否显示模型名称输入框
 const showModelName = computed(() => {
-  const manifest = getProviderManifest(localSettings.value.modelProvider)
-  return manifest ? manifest.requiresModel : !isLocalProvider.value
+  return !isLocalProvider.value && localSettings.value.modelProvider !== 'deepl'
 })
 
 // 计算属性：是否显示RPM限制
