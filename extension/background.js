@@ -1,7 +1,7 @@
 const DEFAULT_SETTINGS = {
   backendUrl: 'http://127.0.0.1:5000',
   targetLanguage: 'zh',
-  sourceLanguage: 'japanese',
+  sourceLanguage: '',
   ocrEngine: '',
   modelProvider: '',
 }
@@ -183,7 +183,8 @@ async function translateImage(imageDataUrl) {
   const apiKey = settings.apiKey || backendDefaults.apiKey || ''
   const customBaseUrl = settings.customBaseUrl || backendDefaults.customBaseUrl || ''
   const targetLanguage = settings.targetLanguage || backendDefaults.targetLanguage || 'zh'
-  const sourceLanguage = settings.sourceLanguage || backendDefaults.sourceLanguage || 'japanese'
+  // 源语言：扩展设置优先，取不到再从后端读
+  const sourceLanguage = settings.sourceLanguage || backendDefaults.sourceLanguage || 'en'
   const ocrEngine = settings.ocrEngine || backendDefaults.ocrEngine || 'manga_ocr'
 
   if (!modelProvider) {
