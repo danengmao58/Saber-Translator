@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Saber Translator 设置</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <h1>Saber Translator</h1>
+      <label>后端地址<input id="backendUrl" type="text" /></label>
+      <label>OCR 引擎
+        <select id="ocrEngine">
+          <option value="">读取主程序设置</option>
+          <option value="manga_ocr">MangaOCR</option>
+          <option value="paddle_ocr">PaddleOCR (ONNX)</option>
+          <option value="paddleocr_vl">PaddleOCR-VL (漫画专用)</option>
+          <option value="baidu_ocr">百度OCR</option>
+          <option value="ai_vision_ocr">AI视觉OCR</option>
+          <option value="48px_ocr">48px OCR</option>
+        </select>
+      </label>
+      <label>翻译服务商
+        <select id="modelProvider">
+          <option value="">读取主程序设置</option>
+          <option value="deepl">DeepL</option>
+          <option value="siliconflow">SiliconFlow</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="volcano">火山引擎</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="custom">自定义 OpenAI</option>
+          <option value="ollama">Ollama (本地)</option>
+          <option value="openai">OpenAI</option>
+          <option value="qwen">通义千问</option>
+          <option value="caiyun">彩云小译</option>
+          <option value="baidu_translate">百度翻译</option>
+          <option value="youdao_translate">有道翻译</option>
+        </select>
+      </label>
+      <button id="save">保存</button>
+      <p class="hint">右键网页图片即可翻译成中文。<br />留空则读取主程序的设置。</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

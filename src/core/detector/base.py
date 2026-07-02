@@ -5,6 +5,8 @@
 """
 
 import logging
+import os
+import threading
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
@@ -48,7 +50,11 @@ class BaseTextDetector(ABC):
         """解析设备，处理 CUDA 不可用的情况"""
         import torch
         if device == 'cuda' and not torch.cuda.is_available():
+            import traceback
             logger.warning("CUDA 不可用，回退到 CPU")
+            logger.warning(f"torch: {torch.__version__}, file: {torch.__file__}, cuda_available: {torch.cuda.is_available()}, device: {device}, pid: {os.getpid()}, thread: {threading.get_ident()}")
+            import sys; logger.warning(f"torch in sys.modules: {sys.modules.get('torch').__file__ if 'torch' in sys.modules else 'NOT FOUND'}")
+            traceback.print_stack()
             return 'cpu'
         return device
     

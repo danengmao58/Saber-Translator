@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Saber Translator",
+  "version": "0.1.0",
+  "description": "右键翻译网页图片中的日语文字，并将中文译文覆盖回图片。",
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>", "http://127.0.0.1:5000/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Saber Translator",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html"
+}
