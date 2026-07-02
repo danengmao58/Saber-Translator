@@ -260,9 +260,10 @@ export function useValidation() {
       }
     }
 
-    // 检查模型名称
+    // 检查模型名称（部分服务不需要模型名称，如 DeepL）
+    const providersRequiringModelName: TranslationProvider[] = ['siliconflow', 'deepseek', 'volcano', 'gemini', 'custom_openai', 'baidu_translate', 'youdao_translate']
     if (!modelName || modelName.trim() === '') {
-      if (isLocalProvider(provider) || requiresApiKey(provider)) {
+      if (isLocalProvider(provider) || providersRequiringModelName.includes(provider)) {
         missingItems.push(`${getProviderDisplayName(provider)} 的模型名称`)
       }
     }

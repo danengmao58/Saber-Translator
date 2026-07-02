@@ -150,6 +150,18 @@
     "supportsJsonResponse": false
   },
   {
+    "id": "deepl",
+    "label": "DeepL",
+    "kind": "adapter",
+    "capabilities": ["translation", "connectionTest"],
+    "requiresApiKey": true,
+    "requiresModel": false,
+    "requiresBaseUrl": false,
+    "isLocal": false,
+    "supportsStream": false,
+    "supportsJsonResponse": false
+  },
+  {
     "id": "openai",
     "label": "OpenAI",
     "kind": "openai_compatible",
